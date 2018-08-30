@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<record_update table="sp_widget">
+    <sp_widget action="INSERT_OR_UPDATE">
+        <category>custom</category>
+        <client_script><![CDATA[function() {  /* widget controller */  var c = this;}]]></client_script>
+        <controller_as>c</controller_as>
+        <css/>
+        <data_table>sp_instance</data_table>
+        <demo_data/>
+        <description/>
+        <docs/>
+        <field_list/>
+        <has_preview>false</has_preview>
+        <id>testsearchnav</id>
+        <internal>false</internal>
+        <link/>
+        <name>TestSearchNav</name>
+        <option_schema/>
+        <public>true</public>
+        <roles/>
+        <script><![CDATA[// populate the 'data' object
+data.t = $sp.getParameter('t');
+data.q = encodeURIComponent($sp.getParameter('q'));
+data.searchSources = [];
+
+//Gotta decide if we want to use the portal's sources, or use the defaults declared by
+//the sys property
+var useDefaultPortals;
+if (!$sp.getPortalRecord()) {
+	useDefaultPortals = true;
+} else {
+	var searchSourcesForPortalGR = new GlideRecord("m2m_sp_portal_search_source");
+	searchSourcesForPortalGR.addQuery("sp_portal", $sp.getPortalRecord().getUniqueValue());
+	searchSourcesForPortalGR.query();
+	useDefaultPortals = searchSourcesForPortalGR.getRowCount() == 0;
+}
+
+var userCriteria = new GlideSPUserCriteria();
+if (useDefaultPortals) {
+	var defaultSearchSourceGR = new GlideRecord("sp_search_source");
+	var defaultSearchSourceIDList = gs.getProperty("glide.service_portal.default_search_sources", "");
+	defaultSearchSourceGR.addQuery("sys_id", "IN", defaultSearchSourceIDList);
+	defaultSearchSourceGR.query();
+	while(defaultSearchSourceGR.next()) {
+		if (!userCanSeeSearchSource(defaultSearchSourceGR))
+			continue;
+
+		data.searchSources.push({
+			name: defaultSearchSourceGR.getDisplayValue("name"),
+			id: defaultSearchSourceGR.getValue("id"),
+			order: defaultSearchSourceIDList.split(",").indexOf(defaultSearchSourceGR.getUniqueValue())
+		});
+	}
+} else {
+	var m2mSearchSourceGR = new GlideRecord("m2m_sp_portal_search_source");
+	m2mSearchSourceGR.addQuery("sp_portal", $sp.getPortalRecord().getUniqueValue());
+	m2mSearchSourceGR.orderBy('order');
+	m2mSearchSourceGR.query();
+	var index = 0;
+	while(m2mSearchSourceGR.next()) {
+		var searchSourceGR = m2mSearchSourceGR.getElement("sp_search_source").getRefRecord();
+
+		if (!userCanSeeSearchSource(searchSourceGR))
+			continue;
+
+		data.searchSources.push({
+			name: searchSourceGR.getDisplayValue("name"),
+			id: searchSourceGR.getValue("id"),
+			order: index
+		});
+		index += 1;
+	}
+}
+
+function userCanSeeSearchSource(sourceGR) {
+	if (userCriteria.isEnabled())
+		return userCriteria.userCanSeeSearchSource(sourceGR.getUniqueValue());
+	else {
+		var gs = GlideSession.get();
+		var searchSourceRoles = sourceGR.getValue("roles");
+		if (searchSourceRoles && !gs.hasRole(searchSourceRoles))
+			return false;
+
+		return true;
+	}
+}]]></script>
+        <servicenow>false</servicenow>
+        <sys_class_name>sp_widget</sys_class_name>
+        <sys_created_by>admin</sys_created_by>
+        <sys_created_on>2018-07-11 06:41:09</sys_created_on>
+        <sys_id>09bc41644f931300e7f701bda310c7f2</sys_id>
+        <sys_mod_count>0</sys_mod_count>
+        <sys_name>TestSearchNav</sys_name>
+        <sys_package display_value="Photon" source="x_203882_innovate">7ed042a14f301300e7f701bda310c75a</sys_package>
+        <sys_policy/>
+        <sys_scope display_value="Photon">7ed042a14f301300e7f701bda310c75a</sys_scope>
+        <sys_update_name>sp_widget_09bc41644f931300e7f701bda310c7f2</sys_update_name>
+        <sys_updated_by>admin</sys_updated_by>
+        <sys_updated_on>2018-07-11 06:41:09</sys_updated_on>
+        <template><![CDATA[<h2 class="sr-only">${Search Categories}</h2>
+
+<div role="list" class="list-group">
+	  <a role="link" ng-class="{active: !data.t}" class="list-group-item" 
+       ng-href="?id=search&q={{data.q}}" aria-label="${All search results}">
+	    <i class="fa fa-chevron-right"/><span class="m-l-sm">${All}</span>
+  	</a>
+	  <a role="link" ng-repeat="source in data.searchSources | orderBy:'order'"
+	     ng-href="?id=search&t={{source.id}}&q={{data.q}}"
+	     ng-class="{active: data.t==source.id}"
+	     class="list-group-item" aria-label="{{source.name}} ${Search results}">
+	  	<i class="fa fa-chevron-right"/><span class="m-l-sm">{{source.name}}</span>
+  	</a>
+</div>]]></template>
+    </sp_widget>
+</record_update>
